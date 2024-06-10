@@ -1,0 +1,1 @@
+cd /d %~dp0&& python facecrop_dir.py
