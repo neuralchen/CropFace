@@ -99,6 +99,7 @@ class Face_detect_crop:
 
         align_img_list = []
         affine_matrix_list = []
+        kps_list  = []
         # print("bbox:", bboxes)
         # max_face = -999
         # maxindex = -1
@@ -138,10 +139,11 @@ class Face_detect_crop:
             align_img   = cv2.cvtColor(np.asarray(align_img),cv2.COLOR_RGB2BGR)
             align_img_list.append(align_img)
             affine_matrix_list.append(M)
+            kps_list.append(kps)
 
         if len(align_img_list)<1:
             return None
-        return align_img_list, affine_matrix_list, bboxes
+        return align_img_list, affine_matrix_list, bboxes, kps_list
     
     def get_snap(self, img, scale_ratio=8, max_num=0):
         bboxes, kpss = self.det_model.detect(img,

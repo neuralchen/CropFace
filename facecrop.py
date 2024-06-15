@@ -149,7 +149,7 @@ class Application(tk.Frame):
         self.test_com = ttk.Combobox(test_frame, textvariable=self.test_var)
         self.test_com.grid(row=0,column=0,sticky=tk.EW)
         self.test_com["value"] = [256,512,768,1024]
-        self.test_com.current(3)
+        self.test_com.current(1)
 
         self.align_var = tkinter.StringVar()
         self.align_com = ttk.Combobox(test_frame, textvariable=self.align_var)
@@ -160,12 +160,12 @@ class Application(tk.Frame):
         self.thredhold = tkinter.StringVar()
         tk.Entry(test_frame, textvariable= self.thredhold, font=font_list)\
                     .grid(row=0,column=3,sticky=tk.EW)
-        self.thredhold.set("45")
+        self.thredhold.set("65")
 
         self.frame_interv = tkinter.StringVar()
         tk.Entry(test_frame, textvariable= self.frame_interv, font=font_list)\
                     .grid(row=0,column=4,sticky=tk.EW)
-        self.frame_interv.set("20")
+        self.frame_interv.set("60")
 
         #################################################################################################
 
@@ -192,7 +192,7 @@ class Application(tk.Frame):
         self.image_scale = ttk.Combobox(scale_frame, textvariable=self.min_scale)
         self.image_scale.grid(row=0,column=1,sticky=tk.EW)
         self.image_scale["value"] = [0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0]
-        self.image_scale.current(3)
+        self.image_scale.current(5)
 
         tk.Label(scale_frame, text="快照尺寸",font=font_list,justify="left")\
                     .grid(row=0,column=2,sticky=tk.EW)
@@ -265,7 +265,7 @@ class Application(tk.Frame):
         self.affine_size = ttk.Combobox(save_frame, textvariable=self.affine_size_var)
         self.affine_size.grid(row=0,column=3,sticky=tk.EW)
         self.affine_size["value"] = [1,4,8,10,16,20,24,32]
-        self.affine_size.current(4)
+        self.affine_size.current(2)
 
         tk.Label(save_frame, text="旋转",font=font_list,justify="left")\
                     .grid(row=0,column=4,sticky=tk.EW)
@@ -358,7 +358,7 @@ class Application(tk.Frame):
     def Save_Face(self):
         thread_update = threading.Thread(target=self.save_task)
         thread_update.start()
-    
+    # save face task
     def save_task(self):
         self.stop_sign=False
         path        = self.img_path.get()
@@ -430,6 +430,9 @@ class Application(tk.Frame):
                 result_face = log_reader.readlines()
         
             save_log    = os.path.join(tg_path_i,"%s_face_save_log.txt"%basepath)
+            if os.path.exists(save_log):
+                print("Video: %s exists! Skip it!"%save_log)
+                continue
             frame_face_list = []
             temp_face       = []
             current_frame   = -1
@@ -445,7 +448,6 @@ class Application(tk.Frame):
                     mode        = str_line[8].strip()
                     if mode == "VGGFace":
                         mode = "None"
-                    frame_interv= int(str_line[4])
                     if not init_detect:
                         self.detect.prepare(ctx_id = 0, det_thresh=0.6,\
                             det_size=(640,640), mode = mode, crop_size=crop_size)
@@ -471,6 +473,8 @@ class Application(tk.Frame):
             print("Processing [%d/%d] video, total %d face in video: %s"%(index_video+1 ,len(videos), len(frame_face_list), i_video))
             if len(frame_face_list)<=0:continue
             video       = cv2.VideoCapture(i_video)
+            landmark_log= os.path.join(tg_path_i,"%s_saveface_landmark.txt"%basepath)
+            landmark_list = []
             for frame_index in tqdm(range(len(frame_face_list))):
                 if self.stop_sign:
                     print("Stop the process!")
@@ -485,13 +489,19 @@ class Application(tk.Frame):
                     detect_results = self.detect.get(frame, transformer_size= affine_size)
                     if detect_results is not None:
                         for item in frame_face_list[frame_index][1:]:
-                            if int(item[1]) >= len(detect_results[0]):
+                            index_face = int(item[1])
+                            if index_face >= len(detect_results[0]):
                                 break
-                            face_i = detect_results[0][int(item[1])]
+                            face_i = detect_results[0][index_face]
+                            landmark_list.append([ frame_face_list[frame_index][0], index_face] + detect_results[3][index_face])
                             f_path =os.path.join(tg_path_i, 
                                                  str(frame_face_list[frame_index][0]).zfill(6)+"_%d.%s"%(int(item[1]),
                                                                                                          tg_format))
                             cv2.imencode('.%s'%tg_format,face_i)[1].tofile(f_path)
+            with open(landmark_log, 'w', encoding="utf-8") as i_file:
+                i_file.writelines("frame_index, face_index, left_eye, right_eye, nose, left_mouth, right_mouth")
+                for i_line in landmark_list:
+                    i_file.writelines(",".join(i_line))
             video.release()    
         print("Face saving finished!")
     
@@ -588,6 +598,10 @@ class Application(tk.Frame):
             basepath    = os.path.splitext(os.path.basename(i_video))[0]
             tg_path_i   = os.path.join(tg_path,basepath)
             file_log_i  = os.path.join(tg_path_i,"%s_face_log.txt"%basepath)
+
+            if os.path.exists(file_log_i):
+                print("Video: %s had been processed! Skip it!"%i_video)
+                continue
 
             with open(log_file,'a+', encoding="utf-8") as logf: # ,encoding='UTF-8'
                 logf.writelines("%s --> %s\n"%(i_video, tg_path_i))
