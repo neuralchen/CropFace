@@ -175,3 +175,32 @@ class Face_detect_crop:
             return None
         return align_img_list, bboxes, kpss_list
     
+    def get_snap_bbox(self, img, max_num=0):
+        bboxes, _ = self.det_model.detect(img,
+                                             threshold=self.det_thresh,
+                                             max_num=max_num,
+                                             metric='default')
+        
+        if bboxes.shape[0] == 0:
+            return None
+
+        align_img_list = []
+        for i in range(bboxes.shape[0]):
+            width = bboxes[i][2] - bboxes[i][0]
+            height = bboxes[i][3] - bboxes[i][1]
+            if max(width,height) < self.min_size:
+                # print("The detected face (%d,%d) is smaller than the minimum value %d"%(width,height,self.min_size))
+                continue
+            shape = img.shape
+            top = bboxes[i][1] if bboxes[i][1]>0 else 0
+            bottom = bboxes[i][3] if bboxes[i][3]<shape[0] else shape[0]
+            left = bboxes[i][0] if bboxes[i][0]>0 else 0
+            right = bboxes[i][2] if bboxes[i][2]<shape[1] else shape[1]
+        
+            align_img     = img[int(top):int(bottom),int(left):int(right),:]
+            align_img_list.append(align_img)
+
+        if len(align_img_list)<1:
+            return None
+        return align_img_list#, bboxes, kpss_list
+    

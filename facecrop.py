@@ -14,6 +14,7 @@
 import  os
 import  cv2
 import  sys
+import  json
 import  glob
 import  shutil
 from    tqdm import tqdm
@@ -160,7 +161,7 @@ class Application(tk.Frame):
         self.thredhold = tkinter.StringVar()
         tk.Entry(test_frame, textvariable= self.thredhold, font=font_list)\
                     .grid(row=0,column=3,sticky=tk.EW)
-        self.thredhold.set("65")
+        self.thredhold.set("20")
 
         self.frame_interv = tkinter.StringVar()
         tk.Entry(test_frame, textvariable= self.frame_interv, font=font_list)\
@@ -192,7 +193,7 @@ class Application(tk.Frame):
         self.image_scale = ttk.Combobox(scale_frame, textvariable=self.min_scale)
         self.image_scale.grid(row=0,column=1,sticky=tk.EW)
         self.image_scale["value"] = [0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0]
-        self.image_scale.current(5)
+        self.image_scale.current(3)
 
         tk.Label(scale_frame, text="快照尺寸",font=font_list,justify="left")\
                     .grid(row=0,column=2,sticky=tk.EW)
@@ -473,8 +474,8 @@ class Application(tk.Frame):
             print("Processing [%d/%d] video, total %d face in video: %s"%(index_video+1 ,len(videos), len(frame_face_list), i_video))
             if len(frame_face_list)<=0:continue
             video       = cv2.VideoCapture(i_video)
-            landmark_log= os.path.join(tg_path_i,"%s_saveface_landmark.txt"%basepath)
-            landmark_list = []
+            landmark_log= os.path.join(tg_path_i,"%s_saveface_landmark.json"%basepath)
+            landmark_list = {}
             for frame_index in tqdm(range(len(frame_face_list))):
                 if self.stop_sign:
                     print("Stop the process!")
@@ -493,15 +494,18 @@ class Application(tk.Frame):
                             if index_face >= len(detect_results[0]):
                                 break
                             face_i = detect_results[0][index_face]
-                            landmark_list.append([ frame_face_list[frame_index][0], index_face] + detect_results[3][index_face])
+                            landmark_list["%d"%frame_face_list[frame_index][0]]={
+                                "frame_index": frame_face_list[frame_index][0],
+                                "face_index":index_face,
+                                "landmark":detect_results[3][index_face].tolist()
+                            }
                             f_path =os.path.join(tg_path_i, 
                                                  str(frame_face_list[frame_index][0]).zfill(6)+"_%d.%s"%(int(item[1]),
                                                                                                          tg_format))
                             cv2.imencode('.%s'%tg_format,face_i)[1].tofile(f_path)
-            with open(landmark_log, 'w', encoding="utf-8") as i_file:
-                i_file.writelines("frame_index, face_index, left_eye, right_eye, nose, left_mouth, right_mouth")
-                for i_line in landmark_list:
-                    i_file.writelines(",".join(i_line))
+            with open(landmark_log, 'w') as cf:
+                configjson  = json.dumps(landmark_list, indent=4)
+                cf.writelines(configjson)
             video.release()    
         print("Face saving finished!")
     
@@ -568,7 +572,7 @@ class Application(tk.Frame):
         mode        = self.align_com.get()
         if mode == "VGGFace":
             mode = "None"
-        crop_size   = int(self.test_com.get())
+        
         
         path        = self.img_path.get()
         tg_path     = self.save_path.get()
@@ -579,6 +583,7 @@ class Application(tk.Frame):
         affine_size = int(affine_size)
         snap_size   = int(self.snap_size_var.get())
         suffix_name = self.suffix_name_var.get()
+        crop_size   = int(self.test_com.get())
 
         min_scale   = float(self.min_scale.get())
         blur_t      = float(blur_t)
@@ -625,19 +630,23 @@ class Application(tk.Frame):
                 video.set(cv2.CAP_PROP_POS_FRAMES, frame_index*frame_interv)
                 ret, frame = video.read()
                 if  ret:
-                    detect_results = self.detect.get_snap(frame, snap_size)
+                    detect_results = self.detect.get_snap_bbox(frame)
                     if detect_results is not None:
-                        for index, face_i in enumerate(detect_results[0]):
+                        for index, face_i in enumerate(detect_results):
                             img1    = cv2.cvtColor(face_i,cv2.COLOR_BGR2GRAY)
                             out     = mean_squared_error(img1[2:,:],img1[:-2,:])
                             out1    = mean_squared_error(img1[:,2:],img1[:,:-2])
                             score   = min(out,out1)
+                            
                             if score < blur_t:
+                                
+                                # print("Score is %f"%score)
                                 continue
+                            # cv2.imwrite("%s-score_%.2f.png"%(frame_index, score), face_i)
                             line_str    = "%d,%d,%d,%.2f\n"%(ok_face,frame_index*frame_interv,index,score)
                             ok_face     += 1
                             face_str.append(line_str)
-                            if len(face_str) > 1000:
+                            if len(face_str) > 200:
                                 with open(file_log_i, 'a+', encoding="utf-8") as i_file:
                                     i_file.writelines(face_str)
                                 face_str = []
