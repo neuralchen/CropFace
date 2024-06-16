@@ -446,10 +446,13 @@ class Application(tk.Frame):
                 if index == 0:
                     # id, target path, file path, blur thredhold, frame ivterval, min scale, snap size, crop size, align mode
                     crop_size   = int(str_line[7])
-                    mode        = str_line[8].strip()
+                    # mode        = str_line[8].strip()
+                    mode = self.align_com.get()
                     if mode == "VGGFace":
                         mode = "None"
                     if not init_detect:
+                        self.detect = None
+                        self.detect = Face_detect_crop(name='antelope', root='./insightface_func/models')
                         self.detect.prepare(ctx_id = 0, det_thresh=0.6,\
                             det_size=(640,640), mode = mode, crop_size=crop_size)
                         affine_size = crop_size * affine_size
@@ -588,6 +591,8 @@ class Application(tk.Frame):
         min_scale   = float(self.min_scale.get())
         blur_t      = float(blur_t)
         print("Blurry thredhold %f"%blur_t)
+        self.detect = None
+        self.detect = Face_detect_crop(name='antelope', root='./insightface_func/models')
         self.detect.prepare(ctx_id = 0, det_thresh=0.6,\
                         det_size=(640,640),mode = mode,crop_size=crop_size,ratio=min_scale)
         log_file = "./dataset_readme.txt"
